@@ -1,0 +1,10 @@
+.venv/
+.idea/
+__pycache__/
+*.pyc
+login_screenshots/
+appium_screenshots/
+app_screenshots/
+outputs/
+.env
+audit_credentials_local.py

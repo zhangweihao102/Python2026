@@ -1,0 +1,14 @@
+# 基础测试框架
+pytest==8.2.0
+
+# 自动化测试驱动
+Appium-Python-Client==3.2.1
+selenium==4.20.0
+playwright==1.43.0
+
+# 截图/OCR辅助
+ddddocr==1.4.11
+Pillow==10.3.0
+
+# 测试报告
+allure-pytest==2.13.5
