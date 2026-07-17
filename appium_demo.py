@@ -7,6 +7,7 @@ from appium.options.android import UiAutomator2Options
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from config import config
 
 
 class AppiumDemoTest(unittest.TestCase):
@@ -20,22 +21,28 @@ class AppiumDemoTest(unittest.TestCase):
         # 配置 Appium 连接参数 (Desired Capabilities)
         options = UiAutomator2Options()
         # 设备信息
-        options.platform_name = 'Android'
+        options.platform_name = config.PLATFORM_NAME
         # 设备名称，可通过 adb devices 获取
-        options.device_name = 'A9GVVB2B16009567' 
+        options.device_name = config.DEVICE_NAME 
         
         # 目标 App 信息
         # 被测 App 的包名
-        options.app_package = 'com.uchat.test'
+        options.app_package = config.APP_PACKAGE
         # 被测 App 的启动 Activity
-        options.app_activity = 'com.chat.login.ui.login.LoginActivity'
+        options.app_activity = config.APP_ACTIVITY
         
         # 其他配置
-        options.no_reset = True # 不要重置 App 数据
-        options.automation_name = 'UiAutomator2' # 使用 UiAutomator2 引擎
+        options.no_reset = config.NO_RESET # 不要重置 App 数据
+        options.automation_name = config.AUTOMATION_NAME # 使用 UiAutomator2 引擎
+        
+        # 规避系统安全键盘弹起导致 UiAutomator 进程被杀 (SecurityException)
+        options.set_capability("unicodeKeyboard", True)
+        options.set_capability("resetKeyboard", True)
+        # 禁用软键盘弹起
+        options.set_capability("appium:disableWindowAnimation", True)
 
         # 连接到本地运行的 Appium Server
-        appium_server_url = 'http://127.0.0.1:4723'
+        appium_server_url = config.APPIUM_SERVER_URL
         
         # 创建 WebDriver 实例
         self.driver = webdriver.Remote(appium_server_url, options=options)
@@ -60,7 +67,7 @@ class AppiumDemoTest(unittest.TestCase):
             # 根据你抓取到的 resource-id: com.uchat.test:id/ivOtherId
             print("⏳ 正在寻找并点击'其他方式登录'图标...")
             other_login_icon = WebDriverWait(self.driver, 15).until(
-                EC.element_to_be_clickable((AppiumBy.ID, "com.uchat.test:id/ivOtherId"))
+                EC.element_to_be_clickable((AppiumBy.ID, f"{config.APP_PACKAGE}:id/ivOtherId"))
             )
             other_login_icon.click()
             print("👆 已点击'其他方式登录'图标")
@@ -70,7 +77,9 @@ class AppiumDemoTest(unittest.TestCase):
             
             # 截图保存当前状态
             step1_pic = os.path.join(self.screenshot_dir, "01_after_click_icon.png")
-            self.driver.save_screenshot(step1_pic)
+            # 规避 Appium 原生截图 API 卡死的问题，改用 adb 截图
+            os.system(f"adb -s {config.DEVICE_NAME} shell screencap -p /data/local/tmp/sc.png")
+            os.system(f"adb -s {config.DEVICE_NAME} pull /data/local/tmp/sc.png {step1_pic}")
             print(f"📸 已保存截图：{step1_pic}")
             
             # 2. 寻找账号输入框并输入
@@ -84,28 +93,28 @@ class AppiumDemoTest(unittest.TestCase):
             
             if len(account_inputs) >= 2:
                 # 第一个是账号输入框
-                account_inputs[0].send_keys("10150903")
+                account_inputs[0].send_keys(config.TEST_ACCOUNT)
                 print("⌨️ 已输入账号")
                 
                 # 第二个是密码输入框 (也可以通过资源 ID 直接定位)
-                pwd_input = self.driver.find_element(AppiumBy.ID, "com.uchat.test:id/et_pwd")
-                pwd_input.send_keys("123456")
+                pwd_input = self.driver.find_element(AppiumBy.ID, f"{config.APP_PACKAGE}:id/et_pwd")
+                pwd_input.send_keys(config.TEST_PASSWORD)
                 print("⌨️ 已输入密码")
             else:
                 # fallback，直接根据刚才抓取的 ID 尝试填密码
-                pwd_input = self.driver.find_element(AppiumBy.ID, "com.uchat.test:id/et_pwd")
-                pwd_input.send_keys("123456")
+                pwd_input = self.driver.find_element(AppiumBy.ID, f"{config.APP_PACKAGE}:id/et_pwd")
+                pwd_input.send_keys(config.TEST_PASSWORD)
                 print("⌨️ 仅找到了密码框并输入密码")
 
             # 3. 点击密码显示图标（眼睛图标）
             print("👆 点击显示密码图标...")
-            pwd_visible_icon = self.driver.find_element(AppiumBy.ID, "com.uchat.test:id/iv_pwd_visible")
+            pwd_visible_icon = self.driver.find_element(AppiumBy.ID, f"{config.APP_PACKAGE}:id/iv_pwd_visible")
             pwd_visible_icon.click()
             time.sleep(1)
             
             # 4. 点击登录按钮
             print("👆 正在点击登录按钮...")
-            login_btn = self.driver.find_element(AppiumBy.ID, "com.uchat.test:id/tv_login")
+            login_btn = self.driver.find_element(AppiumBy.ID, f"{config.APP_PACKAGE}:id/tv_login")
             login_btn.click()
             
             # 等待登录结果加载
@@ -113,13 +122,15 @@ class AppiumDemoTest(unittest.TestCase):
             
             # 截图保存登录后状态
             step2_pic = os.path.join(self.screenshot_dir, "02_after_login.png")
-            self.driver.save_screenshot(step2_pic)
+            os.system(f"adb -s {config.DEVICE_NAME} shell screencap -p /data/local/tmp/sc.png")
+            os.system(f"adb -s {config.DEVICE_NAME} pull /data/local/tmp/sc.png {step2_pic}")
             print(f"📸 已保存登录结果截图：{step2_pic}")
             
         except Exception as e:
             print(f"❌ 测试过程中出现异常：{e}")
             error_pic = os.path.join(self.screenshot_dir, "error.png")
-            self.driver.save_screenshot(error_pic)
+            os.system(f"adb -s {config.DEVICE_NAME} shell screencap -p /data/local/tmp/sc.png")
+            os.system(f"adb -s {config.DEVICE_NAME} pull /data/local/tmp/sc.png {error_pic}")
             print(f"📸 已保存异常现场截图：{error_pic}")
             raise
 
