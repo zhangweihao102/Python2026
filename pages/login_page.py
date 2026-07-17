@@ -8,11 +8,11 @@ class LoginPage(BasePage):
     """
     
     # ================= 元素定位器 (Locators) =================
-    OTHER_LOGIN_ICON = (AppiumBy.ID, "com.uchat.test:id/ivOtherId")
+    OTHER_LOGIN_ICON = (AppiumBy.ID, "so.fun.test:id/ivOtherId")
     ALL_EDIT_TEXTS = (AppiumBy.CLASS_NAME, "android.widget.EditText")
-    PWD_INPUT = (AppiumBy.ID, "com.uchat.test:id/et_pwd")
-    PWD_VISIBLE_ICON = (AppiumBy.ID, "com.uchat.test:id/iv_pwd_visible")
-    LOGIN_BTN = (AppiumBy.ID, "com.uchat.test:id/tv_login")
+    PWD_INPUT = (AppiumBy.ID, "so.fun.test:id/et_pwd")
+    PWD_VISIBLE_ICON = (AppiumBy.ID, "so.fun.test/iv_pwd_visible")
+    LOGIN_BTN = (AppiumBy.ID, "so.fun.test:id/tv_login")
 
     # ================= 页面操作方法 =================
     def click_other_login(self):
