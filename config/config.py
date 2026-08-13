@@ -5,7 +5,7 @@ APPIUM_SERVER_URL = 'http://127.0.0.1:4723'
 
 # ================= 设备与应用配置 =================
 PLATFORM_NAME = 'Android'
-DEVICE_NAME = '10CDAB0GEC0057Q'  # 你的测试设备ID
+DEVICE_NAME = 'A9GVVB2B16009567'  # 你的测试设备ID
 APP_PACKAGE = 'so.fun.test'    # 测试包名
 APP_ACTIVITY = 'com.chat.login.ui.login.LoginActivity'  # 启动 Activity
 AUTOMATION_NAME = 'UiAutomator2'
