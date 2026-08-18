@@ -1,70 +1,88 @@
+import time
+from common.adb_utils import AdbUtils
 from appium.webdriver.common.appiumby import AppiumBy
-from core.base_page import BasePage
+from selenium.common.exceptions import NoSuchElementException
 
-class LoginPage(BasePage):
+class LoginPage:
     """
-    登录页面模型 (Page Object)
-    将登录页面上的所有【元素定位器】和【页面操作】封装在这里
+    登录页面对象 (Page Object)
+    专门存放登录页面的所有操作，将业务逻辑与具体的定位/点击细节解耦
     """
     
-    # ================= 元素定位器 (Locators) =================
-    OTHER_LOGIN_ICON = (AppiumBy.ID, "so.fun.test:id/ivOtherId")
-    ALL_EDIT_TEXTS = (AppiumBy.CLASS_NAME, "android.widget.EditText")
-    PWD_INPUT = (AppiumBy.ID, "so.fun.test:id/et_pwd")
-    PWD_VISIBLE_ICON = (AppiumBy.ID, "so.fun.test/iv_pwd_visible")
-    LOGIN_BTN = (AppiumBy.ID, "so.fun.test:id/tv_login")
+    def __init__(self, driver):
+        self.driver = driver
 
-    # ================= 页面操作方法 =================
-    def click_other_login(self):
-        """点击其他方式登录图标"""
-        print("[INFO] 正在寻找并点击'其他方式登录'图标...")
-        try:
-            self.click(self.OTHER_LOGIN_ICON, timeout=5)
-            self.sleep(2)  # 等待跳转动画
-            self.save_screenshot("01_after_click_icon.png")
-            print("[INFO] 成功点击'其他方式登录'图标")
-        except Exception as e:
-            print("[WARN] 未找到'其他方式登录'图标，可能已经处于登录页面。")
+    def click_other_login_method(self):
+        """首页：点击'其他方式登录'"""
+        print("👆 等待 'Sign in with Google' 登录首页完全加载...")
+        time.sleep(5)  # 启动后增加等待时间，确保首页完全加载完毕
 
-    def input_credentials(self, account, pwd):
-        """输入账号和密码"""
-        print("[INFO] 正在寻找并输入账号密码...")
-        # 找页面里所有的输入框
-        inputs = self.find_elements(self.ALL_EDIT_TEXTS)
-        if len(inputs) >= 2:
-            inputs[0].send_keys(account)
-            print(f"[INFO] 已输入账号: {account}")
-            
-            self.input_text(self.PWD_INPUT, pwd)
-            print("[INFO] 已输入密码: ******")
-        else:
-            # Fallback：只通过资源 ID 定位密码框
-            self.input_text(self.PWD_INPUT, pwd)
-            print("[INFO] 仅找到了密码框并输入密码: ******")
+        print("👆 正在点击'其他方式登录'图标...")
+        el = self.driver.find_element(AppiumBy.XPATH, '//android.widget.ImageView[@resource-id="so.fun.test:id/ivOtherId"]')
+        el.click()
+        time.sleep(5)  # 等待动画和页面跳转
 
-    def click_pwd_visible(self):
-        """点击显示密码的眼睛图标"""
-        print("[INFO] 点击显示密码图标...")
-        self.click(self.PWD_VISIBLE_ICON)
-        self.sleep(1)
+    def input_account(self, account):
+        """登录页：输入账号"""
+        print("⌨️ 正在输入账号...")
+        el = self.driver.find_element(AppiumBy.XPATH, '//android.widget.EditText[@resource-id="so.fun.test:id/et_id"]')
+        el.click()
+        el.clear()
+        el.send_keys(account)
+        time.sleep(1)
 
-    def click_login(self):
-        """点击登录按钮"""
-        print("[INFO] 正在点击登录按钮...")
-        self.click(self.LOGIN_BTN)
-        self.sleep(8)  # 增加等待时间，确保完全进入 App 首页（可根据实际网络情况调整）
+    def input_password(self, password):
+        """输入密码并收起键盘"""
+        print(f"⌨️ 输入密码: {'*' * len(password)}")
+        el = self.driver.find_element(AppiumBy.XPATH, '//android.widget.EditText[@resource-id="so.fun.test:id/et_pwd"]')
+        el.click()
+        el.clear()
+        el.send_keys(password)
         
-        # 加上时间戳保存截图
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.save_screenshot(f"02_after_login_{timestamp}.png")
+        print("🔙 输入完成，正在收起软键盘...")
+        # 调用底层 ADB 工具强制收起键盘
+        AdbUtils.press_back()
+        time.sleep(2)  # 给键盘收起的动画留出充足时间
 
-    # ================= 业务流程组合 =================
-    def login_flow(self, account, pwd):
+    def hide_keyboard(self):
+        """收起键盘（确保底部按钮位置正确）"""
+        print("⌨️ 尝试收起键盘...")
+        AdbUtils.keyevent(4)  # 返回键，用于收起软键盘
+        time.sleep(2)
+
+    def click_login_btn(self):
+        """登录页：点击底部的紫色登录按钮"""
+        print("👆 正在点击最底部的登录按钮...")
+        el = self.driver.find_element(AppiumBy.XPATH, '//android.widget.TextView[@resource-id="so.fun.test:id/tv_login"]')
+        el.click()
+        time.sleep(6)  # 等待登录结果加载及可能的权限弹窗
+
+    def handle_permission_popup(self):
+        """处理首次登录后的通知权限弹窗"""
+        print("🔍 检查是否有通知权限弹窗...")
+        try:
+            # 设置一个较短的隐式等待，专门用于找弹窗，避免没弹窗时卡住太久
+            self.driver.implicitly_wait(3)
+            allow_btn = self.driver.find_element(AppiumBy.XPATH, '//android.widget.Button[@resource-id="com.android.permissioncontroller:id/permission_allow_button"]')
+            print("👆 发现通知权限弹窗，点击'始终允许'...")
+            allow_btn.click()
+            time.sleep(2)
+        except NoSuchElementException:
+            print("✅ 未发现通知权限弹窗，继续执行。")
+        finally:
+            # 恢复全局的隐式等待时间（这里假设全局设为 10 秒，你也可以根据 conftest.py 调整）
+            self.driver.implicitly_wait(10)
+
+    def do_login(self, account, password):
         """
-        组合操作：执行完整的登录业务流
+        组合动作：执行完整的登录业务流
         """
-        self.click_other_login()
-        self.input_credentials(account, pwd)
-        self.click_pwd_visible()
-        self.click_login()
+        print("\n--- 🏁 开始自动登录流程 ---")
+        self.click_other_login_method()
+        self.input_account(account)
+        self.input_password(password)
+        # 注释掉强制收起键盘的操作，避免触发物理返回键退出页面
+        # self.hide_keyboard()
+        self.click_login_btn()
+        self.handle_permission_popup()
+        print("--- 🏁 登录流程执行完毕 ---\n")

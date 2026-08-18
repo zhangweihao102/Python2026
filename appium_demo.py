@@ -35,11 +35,21 @@ class AppiumDemoTest(unittest.TestCase):
         options.no_reset = config.NO_RESET # 不要重置 App 数据
         options.automation_name = config.AUTOMATION_NAME # 使用 UiAutomator2 引擎
         
+        # 防止 Appium 在初始化时强制重启 App（如果需要每次都从头跑，可以把这两行注释掉）
+        # options.set_capability("appium:dontStopAppOnReset", True)
+        # options.set_capability("appium:forceAppLaunch", False)
+        
         # 规避系统安全键盘弹起导致 UiAutomator 进程被杀 (SecurityException)
-        options.set_capability("unicodeKeyboard", True)
-        options.set_capability("resetKeyboard", True)
-        # 禁用软键盘弹起
+        # options.set_capability("unicodeKeyboard", True)
+        # options.set_capability("resetKeyboard", True)
+        # 禁用软键盘弹起，避免动画影响
         options.set_capability("appium:disableWindowAnimation", True)
+        # 核心：无视动画等待，直接获取元素 (针对首页轮播图)
+        options.set_capability("appium:settings[waitForIdleTimeout]", 0)
+        # 测试结束后不要杀掉 App，方便观察最后停在哪里
+        options.set_capability("appium:shouldTerminateApp", False)
+        # 已经手动安装，跳过服务端安装，避免超时
+        options.set_capability("appium:skipServerInstallation", True)
 
         # 连接到本地运行的 Appium Server
         appium_server_url = config.APPIUM_SERVER_URL
@@ -64,16 +74,14 @@ class AppiumDemoTest(unittest.TestCase):
         
         try:
             # 1. 等待并点击“其他方式登录”图标
-            # 根据你抓取到的 resource-id: com.uchat.test:id/ivOtherId
+            # 注意：如果你的应用启动后不在这个页面，可以把这段注释掉
+            print("⏳ 等待首页完全加载...")
+            time.sleep(5)
             print("⏳ 正在寻找并点击'其他方式登录'图标...")
-            other_login_icon = WebDriverWait(self.driver, 15).until(
-                EC.element_to_be_clickable((AppiumBy.ID, f"{config.APP_PACKAGE}:id/ivOtherId"))
-            )
-            other_login_icon.click()
-            print("👆 已点击'其他方式登录'图标")
-            
-            # 等待页面跳转动画
-            time.sleep(2)
+            # 注意：这里的 418 1275 是在 720x1600 分辨率下的估算位置
+            # 如果在首页点不到，需要根据实际截图重新测算这个按钮的坐标
+            os.system(f"adb -s {config.DEVICE_NAME} shell input tap 418 1275")
+            time.sleep(5)
             
             # 截图保存当前状态
             step1_pic = os.path.join(self.screenshot_dir, "01_after_click_icon.png")
@@ -82,40 +90,36 @@ class AppiumDemoTest(unittest.TestCase):
             os.system(f"adb -s {config.DEVICE_NAME} pull /data/local/tmp/sc.png {step1_pic}")
             print(f"📸 已保存截图：{step1_pic}")
             
-            # 2. 寻找账号输入框并输入
+            # 2. 找到账号输入框并输入
             print("⏳ 正在寻找并输入账号...")
-            # 你的提示里没有单独列出账号框，通常它叫 et_phone 或 et_account，我先假设它的 ID 叫 et_account，
-            # 或者如果是通过 text="Email/Phone" 之类的提示，我们可以通过 class 定位。
-            # 为了稳妥，我们通过找所有的 EditText 来定位：第一个通常是账号，第二个是密码 (et_pwd)
-            account_inputs = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_all_elements_located((AppiumBy.CLASS_NAME, "android.widget.EditText"))
-            )
+            time.sleep(4)  # 强制等待 4 秒，让页面完全加载完毕
             
-            if len(account_inputs) >= 2:
-                # 第一个是账号输入框
-                account_inputs[0].send_keys(config.TEST_ACCOUNT)
-                print("⌨️ 已输入账号")
-                
-                # 第二个是密码输入框 (也可以通过资源 ID 直接定位)
-                pwd_input = self.driver.find_element(AppiumBy.ID, f"{config.APP_PACKAGE}:id/et_pwd")
-                pwd_input.send_keys(config.TEST_PASSWORD)
-                print("⌨️ 已输入密码")
-            else:
-                # fallback，直接根据刚才抓取的 ID 尝试填密码
-                pwd_input = self.driver.find_element(AppiumBy.ID, f"{config.APP_PACKAGE}:id/et_pwd")
-                pwd_input.send_keys(config.TEST_PASSWORD)
-                print("⌨️ 仅找到了密码框并输入密码")
-
-            # 3. 点击密码显示图标（眼睛图标）
-            print("👆 点击显示密码图标...")
-            pwd_visible_icon = self.driver.find_element(AppiumBy.ID, f"{config.APP_PACKAGE}:id/iv_pwd_visible")
-            pwd_visible_icon.click()
+            # 由于底层 UiAutomation 在此页面极其容易崩溃死锁，改用 ADB 坐标点击和输入规避
+            print("👆 使用坐标点击账号输入框...")
+            os.system(f"adb -s {config.DEVICE_NAME} shell input tap 360 384")
             time.sleep(1)
+            print("⌨️ 正在输入账号...")
+            os.system(f"adb -s {config.DEVICE_NAME} shell input text {config.TEST_ACCOUNT}")
+            
+            # 输入密码
+            print("👆 使用坐标点击密码输入框...")
+            # 密码框通常在账号框下方，大约 y 增加 120 像素左右
+            os.system(f"adb -s {config.DEVICE_NAME} shell input tap 360 500")
+            time.sleep(1)
+            print("⌨️ 正在输入密码...")
+            os.system(f"adb -s {config.DEVICE_NAME} shell input text {config.TEST_PASSWORD}")
+
+            # 3. 收起键盘（极其重要）
+            # 使用 ADB 输入文本时，有时键盘会弹出，有时不会。
+            # 为了确保登录按钮在屏幕最下方，我们强制发送收起键盘的指令，并等待 UI 稳定
+            print("⌨️ 尝试收起键盘（确保按钮回落到最底部）...")
+            os.system(f"adb -s {config.DEVICE_NAME} shell input keyevent 4") # 返回键，用来收起真实设备的软键盘
+            time.sleep(2)
             
             # 4. 点击登录按钮
-            print("👆 正在点击登录按钮...")
-            login_btn = self.driver.find_element(AppiumBy.ID, f"{config.APP_PACKAGE}:id/tv_login")
-            login_btn.click()
+            print("👆 正在点击最底部的登录按钮...")
+            # 键盘收起后，紫色的登录按钮会在屏幕偏下方 (Y=1400左右)
+            os.system(f"adb -s {config.DEVICE_NAME} shell input tap 360 1400")
             
             # 等待登录结果加载
             time.sleep(4)
